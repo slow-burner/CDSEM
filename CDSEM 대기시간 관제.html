@@ -1,0 +1,397 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>CDSEM 대기시간 관제</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap">
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#08070C; --surface:#121019; --surface-2:#1A1724; --line:rgba(180,160,255,.10); --line-2:rgba(180,160,255,.18);
+  --text:#EEEBF6; --text-2:#B4AEC6; --muted:#7D7792;
+  --p1:#6D28D9; --p2:#8B5CF6; --p3:#C084FC; --p4:#F0ABFC;
+  --grad:linear-gradient(120deg,#6D28D9 0%,#8B5CF6 45%,#D946EF 100%);
+  --teal:#5EEAD4;
+  --good:#34D399; --warn:#FBBF24; --crit:#F87171;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{margin:0;color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;
+  background:
+    radial-gradient(900px 480px at 85% -10%,rgba(139,92,246,.28),transparent 60%),
+    radial-gradient(700px 420px at -10% 30%,rgba(217,70,239,.12),transparent 60%),
+    var(--bg);
+  background-attachment:fixed;}
+.wrap{max-width:1360px;margin:0 auto;padding-inline:24px;padding-block:24px 48px;display:grid;gap:20px}
+@media (max-width:600px){.wrap{padding-inline:16px}}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* header */
+header.top{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:14px;align-items:center}
+.logo{width:40px;height:40px;border-radius:12px;background:var(--grad);display:grid;place-items:center;box-shadow:0 0 28px rgba(139,92,246,.55)}
+.logo svg{width:22px;height:22px}
+.brand h1{margin:0;font-size:19px;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+.brand p{margin:0;color:var(--muted);font-size:12.5px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{all:unset;cursor:pointer;padding:6px 12px;border-radius:8px;color:var(--text-2);font-size:12.5px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--surface-2);color:var(--text);box-shadow:inset 0 0 0 1px var(--line-2)}
+.seg button:focus-visible,.btn:focus-visible{outline:2px solid var(--p3);outline-offset:2px}
+.live{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-2);padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 10px var(--good)}
+.example{font-size:11px;color:var(--warn);border:1px solid rgba(251,191,36,.3);padding:3px 9px;border-radius:999px;background:rgba(251,191,36,.06)}
+
+/* hero */
+.hero{position:relative;border-radius:20px;padding:24px;overflow:hidden;
+  background:linear-gradient(135deg,rgba(109,40,217,.55),rgba(139,92,246,.22) 45%,rgba(18,16,25,.9) 75%),var(--surface);
+  border:1px solid rgba(192,132,252,.28);display:grid;grid-template-columns:1.1fr 2fr;gap:24px}
+.hero::after{content:"";position:absolute;right:-120px;top:-120px;width:360px;height:360px;border-radius:50%;
+  background:radial-gradient(circle,rgba(240,171,252,.35),transparent 65%);pointer-events:none}
+.hero .eyebrow{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--p4);font-weight:600}
+.hero h2{margin:8px 0 6px;font-size:15px;font-weight:500;color:var(--text-2)}
+.bignum{font-family:var(--mono);font-size:56px;font-weight:700;line-height:1;letter-spacing:-.03em;
+  background:linear-gradient(180deg,#fff 20%,#D8B4FE);-webkit-background-clip:text;background-clip:text;color:transparent}
+.bignum small{font-size:22px;margin-left:4px;color:var(--p4);-webkit-text-fill-color:var(--p4)}
+.hero .sub{margin-top:10px;color:var(--text-2);font-size:13px;max-width:36ch}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;position:relative;z-index:1}
+.kpi{background:rgba(8,7,12,.55);backdrop-filter:blur(8px);border:1px solid var(--line-2);border-radius:14px;padding:14px 16px;display:grid;gap:6px;align-content:start}
+.kpi .k{font-size:12px;color:var(--text-2)}
+.kpi .v{font-family:var(--mono);font-size:24px;font-weight:600;letter-spacing:-.02em}
+.kpi .v .u{font-size:13px;color:var(--muted);margin-left:2px}
+.kpi .d{font-size:11.5px;display:flex;gap:6px;align-items:center;color:var(--muted)}
+.chip{white-space:nowrap;flex:none;display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
+.chip.good{color:var(--good);background:rgba(52,211,153,.1)}
+.chip.warn{color:var(--warn);background:rgba(251,191,36,.1)}
+.chip.crit{color:var(--crit);background:rgba(248,113,113,.1)}
+.chip.info{color:var(--p3);background:rgba(192,132,252,.12)}
+.spark{height:28px;width:100%}
+@media (max-width:1100px){.hero{grid-template-columns:1fr}}
+@media (max-width:700px){.kpis{grid-template-columns:repeat(2,1fr)}.bignum{font-size:44px}}
+
+/* panels */
+.grid{display:grid;gap:20px;grid-template-columns:repeat(12,1fr)}
+.panel{background:linear-gradient(180deg,rgba(26,23,36,.9),rgba(18,16,25,.9));border:1px solid var(--line);border-radius:18px;padding:20px;min-width:0}
+.panel h3{margin:0;font-size:15px;font-weight:600}
+.panel .ph{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.panel .ph p{margin:2px 0 0;color:var(--muted);font-size:12px}
+.c8{grid-column:span 8}.c4{grid-column:span 4}.c7{grid-column:span 7}.c5{grid-column:span 5}.c12{grid-column:span 12}
+@media (max-width:1100px){.c8,.c4,.c7,.c5{grid-column:span 12}}
+
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--text-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:10px;height:3px;border-radius:2px;display:inline-block}
+
+.chart{position:relative}
+.chart svg{font-family:var(--sans);display:block;width:100%;height:auto;overflow:visible}
+.tip{position:absolute;pointer-events:none;background:#0C0A12;border:1px solid var(--line-2);border-radius:10px;padding:8px 10px;font-size:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);transform:translate(-50%,-110%);white-space:nowrap;z-index:5}
+.tip b{font-family:var(--mono);font-weight:600}
+.tip .t{color:var(--muted);font-size:11px}
+
+/* equipment */
+.eq{display:grid;gap:8px}
+.eqrow{display:grid;grid-template-columns:62px 44px 1fr 56px 74px;gap:10px;align-items:center;padding:5px 10px;border-radius:10px;font-size:12.5px}
+.eqrow:hover{background:rgba(139,92,246,.07)}
+.eqrow.head{color:var(--muted);font-size:11px;padding-block:0}
+.eqrow.head:hover{background:none}
+.bar{height:8px;border-radius:999px;background:rgba(255,255,255,.05);position:relative;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;border-radius:999px;background:var(--grad)}
+.tag{font-size:10.5px;padding:1px 6px;border-radius:6px;border:1px solid var(--line-2);color:var(--text-2);text-align:center}
+.tag.ded{color:var(--p4);border-color:rgba(240,171,252,.35);background:rgba(240,171,252,.06)}
+
+/* table */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:820px}
+th,td{text-align:left;padding:12px 12px;border-bottom:1px solid var(--line);vertical-align:top;font-size:13px}
+th{font-size:11px;color:var(--muted);font-weight:500;letter-spacing:.04em}
+td .m{color:var(--muted);font-size:12px;margin-top:2px}
+td.no{font-family:var(--mono);color:var(--p3);font-weight:600}
+tr:hover td{background:rgba(139,92,246,.05)}
+.status{display:inline-flex;gap:6px;align-items:center;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap}
+.status::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.s-done{color:var(--good);background:rgba(52,211,153,.1)}
+.s-ver{color:var(--p3);background:rgba(192,132,252,.12)}
+.s-run{color:var(--teal);background:rgba(94,234,212,.1)}
+
+/* model */
+.stages{display:grid;gap:10px}
+.stage{display:grid;grid-template-columns:34px 1fr;gap:12px;padding:14px;border-radius:14px;border:1px solid var(--line);background:rgba(8,7,12,.4)}
+.stage .n{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:13px}
+.stage:nth-child(1) .n{background:var(--grad);color:#fff}
+.stage:nth-child(2) .n{background:rgba(139,92,246,.3);color:var(--p4)}
+.stage:nth-child(3) .n{background:rgba(255,255,255,.06);color:var(--text-2)}
+.stage h4{margin:0 0 2px;font-size:13.5px;font-weight:600;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.stage p{margin:0;color:var(--text-2);font-size:12.5px}
+
+.alerts{display:grid;gap:6px}
+.al{display:grid;grid-template-columns:62px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;background:rgba(248,113,113,.05);border:1px solid rgba(248,113,113,.15);font-size:12.5px}
+.al span:nth-child(2){color:var(--text-2)}
+.crit-t{color:var(--crit);font-weight:600}
+.road{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.road .card{padding:16px;border-radius:14px;border:1px dashed var(--line-2);background:rgba(8,7,12,.35);display:grid;gap:6px;align-content:start}
+.road .card h4{margin:0;font-size:14px}
+.road .card p{margin:0;color:var(--text-2);font-size:12.5px}
+.road .card.hl{border-style:solid;border-color:rgba(192,132,252,.4);background:linear-gradient(160deg,rgba(109,40,217,.25),rgba(8,7,12,.35))}
+@media (max-width:800px){.road{grid-template-columns:1fr}}
+
+.foot{color:var(--muted);font-size:11.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+@media (prefers-reduced-motion:no-preference){
+  .glow-line{filter:drop-shadow(0 0 6px rgba(192,132,252,.6))}
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+      </div>
+      <div>
+        <h1>CDSEM 대기시간 관제</h1>
+        <p>MI팀 · 설비 CAPA 확보 및 재공 관리 효율화</p>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="층 선택">
+        <button id="f-all" aria-pressed="true" data-f="all">전체</button>
+        <button id="f-3" aria-pressed="false" data-f="3F">3층</button>
+        <button id="f-8" aria-pressed="false" data-f="8F">8층</button>
+      </div>
+      <span class="example">추이·설비 현황은 예시 데이터</span>
+      <span class="live"><span class="dot"></span>2026-09-28 기준</span>
+    </div>
+  </header>
+
+  <section class="hero" aria-label="핵심 성과">
+    <div style="position:relative;z-index:1">
+      <div class="eyebrow">월간 설비 CAPA 순증</div>
+      <h2>항목 최적화 + 샘플링 확대로 확보한 가용시간</h2>
+      <div class="bignum">+37.0<small>h / 월</small></div>
+      <p class="sub">신규 설비 증설 없이 창출한 여력입니다. %%140260 Normal PPID 3개 ITEM 삭제분이 28.8h를 차지합니다.</p>
+    </div>
+    <div class="kpis">
+      <div class="kpi">
+        <span class="k">WAIT 재공 피크</span>
+        <span class="v">−50<span class="u">%</span></span>
+        <span class="d"><span class="chip good">▼ 개선</span>초단축 전환 1,000→500매</span>
+      </div>
+      <div class="kpi">
+        <span class="k">대기시간 산포</span>
+        <span class="v">−35<span class="u">%</span></span>
+        <span class="d"><span class="chip good">▼ 개선</span>포트 8대 분리·전용화</span>
+      </div>
+      <div class="kpi">
+        <span class="k">평균 대기시간</span>
+        <span class="v">35.1<span class="u">분</span></span>
+        <span class="d"><span class="chip info">검증 중</span>기존 35.9분</span>
+      </div>
+      <div class="kpi">
+        <span class="k">매당 측정시간</span>
+        <span class="v">69.25<span class="u">분</span></span>
+        <span class="d"><span class="chip good">▼ 12.0분</span>기존 81.25분</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="panel c8" aria-labelledby="t-trend">
+      <div class="ph">
+        <div><h3 id="t-trend">일별 평균 대기시간</h3><p>9/1 – 9/28 · 세로선은 조치 적용일</p></div>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--p3)"></i>평균 대기(분)</span>
+          <span><i class="sw" style="background:var(--muted)"></i>조치 전 평균 35.9</span>
+        </div>
+      </div>
+      <div class="chart" id="trend"></div>
+    </section>
+
+    <section class="panel c4" aria-labelledby="t-capa">
+      <div class="ph"><div><h3 id="t-capa">CAPA 확보 구성</h3><p>월 가용시간 순증 (h)</p></div></div>
+      <div class="chart" id="capa"></div>
+    </section>
+
+    <section class="panel c7" aria-labelledby="t-eq">
+      <div class="ph">
+        <div><h3 id="t-eq">호기별 현황</h3><p>7.7 M/A STEP 장ST 전용 8대 · 대기 랏 · 임계 초과</p></div>
+        <div class="legend"><span><span class="tag ded">전용</span>장ST 전용 호기</span></div>
+      </div>
+      <div class="eq" id="eq"></div>
+    </section>
+
+    <section class="panel c5" aria-labelledby="t-model">
+      <div class="ph"><div><h3 id="t-model">대기시간 3대 구간 분해</h3><p>자체 전산 설정으로 가능한 ①·② 우선 착수</p></div></div>
+      <div class="stages">
+        <div class="stage"><div class="n">①</div><div><h4>측정 총량 <span class="chip good">CAPA 확보</span></h4><p>비필수 항목 삭제, 샘플링 확대로 물리적 처리 여력 우선 확보</p></div></div>
+        <div class="stage"><div class="n">②</div><div><h4>투입 순서 · 타이밍 <span class="chip info">전산 설정</span></h4><p>선제적 고속 전환, 포트 설정 분리로 가용 상태와 매칭 최적화</p></div></div>
+        <div class="stage"><div class="n">③</div><div><h4>설비 앞 도착 <span class="chip warn">타부서 협의</span></h4><p>가중치 보정 선행, 반송 지연은 물류 부서와 근본 개선 협의</p></div></div>
+      </div>
+      <div class="ph" style="margin:20px 0 10px"><div><h3>임계 초과 LOT</h3><p>대기 60분 초과 · 최근 발생 순</p></div><span class="chip crit">4건</span></div>
+      <div class="alerts">
+        <div class="al"><span class="num">CD-04</span><span>7.7 M/A · ESOP</span><span class="num crit-t">78분</span></div>
+        <div class="al"><span class="num">CD-04</span><span>7.7 M/A · APC</span><span class="num crit-t">66분</span></div>
+        <div class="al"><span class="num">CD-01</span><span>%%140260 Normal</span><span class="num crit-t">64분</span></div>
+        <div class="al"><span class="num">CD-08</span><span>7.7 M/A · ESOP</span><span class="num crit-t">61분</span></div>
+      </div>
+    </section>
+
+    <section class="panel c12" aria-labelledby="t-tasks">
+      <div class="ph">
+        <div><h3 id="t-tasks">개선 과제 실효성 검증</h3><p>5개 과제 · 완료 1 · 운영 중 1 · 검증 중 3</p></div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>NO</th><th>과제</th><th>조치 (적용일)</th><th>개선 원리</th><th>확인 지표 · 결과</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr><td class="no">01</td><td>초단축 전환 기준</td><td>전환 기준 <span class="num">1,000 → 500</span>매<div class="m">9/15</div></td><td>재공 부하 발생 전 초단축 PPID로 조기 전환</td><td>평균 대기 <span class="num">35.9 → 35.1</span><div class="m">추이 확인 중</div></td><td><span class="status s-ver">검증 중</span></td></tr>
+            <tr><td class="no">02</td><td>설비 T/I 순서</td><td>모델별 2~3대 APC·ESOP T/I 순위 상향</td><td>ST 짧은 LOT을 지정 설비에서 선진행해 대기 누적 해소</td><td>APC·ESOP 평균 대기시간<div class="m">전후 2주 비교</div></td><td><span class="status s-ver">검증 중</span></td></tr>
+            <tr><td class="no">03</td><td>측정 ITEM 효율화</td><td>%%140260 ITEM 3개 삭제, <span class="num">81.25 → 69.25</span>분<div class="m">9/15</div></td><td>부서 협의로 중복 항목 정리, 매당 측정시간 단축</td><td>월 <span class="num">28.8h</span> CAPA 확보<div class="m">144매 기준</div></td><td><span class="status s-done">완료</span></td></tr>
+            <tr><td class="no">04</td><td>ST 긴 STEP 호기 제한</td><td>7.7 M/A STEP <span class="num">12 → 8</span>대 제한</td><td>장ST 물량을 지정 호기로 모아 잔여 호기 단ST 여력 확보</td><td>잔여 호기 대기시간 · 장ST LOT 대기</td><td><span class="status s-run">운영 중</span></td></tr>
+            <tr><td class="no">05</td><td>설비 Working 가중치</td><td>3층 설비 가중치 상향<div class="m">9/18</div></td><td>R/D 설비로 LOT 반송 우선 배정, 층간 반송 지연 완화</td><td>R/D → T/I 시간 · 가동률 편차<div class="m">8층 대비</div></td><td><span class="status s-ver">검증 중</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel c12" aria-labelledby="t-road">
+      <div class="ph"><div><h3 id="t-road">후속 과제 로드맵</h3><p>다음 분기 착수 항목</p></div></div>
+      <div class="road">
+        <div class="card"><span class="chip info" style="justify-self:start">스크리닝</span><h4>과다 공정 조건 스크리닝·최적화</h4><p>타 라인 대비 ITEM 수가 많은 측정량 상위 구간을 분석해 단위공정 파트와 일치화 협의</p></div>
+        <div class="card"><span class="chip info" style="justify-self:start">세대 비교</span><h4>상위 14개 공정 이전 세대 비교</h4><p>측정률 상위 14개 STEP의 ITEM 구성을 이전 세대와 대조해 삭제 가능 항목 도출</p></div>
+        <div class="card hl"><span class="chip good" style="justify-self:start">이 화면</span><h4>실시간 대기시간 자동 관리 TOOL</h4><p>설비별 체류시간, 대기 랏 수, 임계 초과 건수를 자동 집계하는 자체 대시보드</p></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="foot">
+    <span>출처: MI팀 CDSEM 설비 CAPA 확보 및 재공 관리 효율화 보고 자료</span>
+    <span>임계 대기: 60분 (예시 기준)</span>
+  </div>
+</div>
+
+<script>
+(function(){
+  const NS="http://www.w3.org/2000/svg";
+  const el=(t,a={},p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;};
+  const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+  /* ---- trend (example data) ---- */
+  const days=[],vals=[];
+  let seed=7;const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280;};
+  for(let d=1;d<=28;d++){
+    days.push("9/"+d);
+    const base=d<15?35.9:(d<18?35.6:35.1);
+    const spread=d<17?1.6:1.0;
+    vals.push(+(base+(rnd()-.5)*2*spread).toFixed(1));
+  }
+  const events=[{d:15,l:"9/15 전환 500매 · ITEM 삭제"},{d:17,l:"9/17 포트 분리"},{d:18,l:"9/18 3층 가중치"}];
+
+  function drawTrend(){
+    const host=document.getElementById("trend");host.innerHTML="";
+    const W=760,H=280,m={l:40,r:16,t:30,b:28};
+    const svg=el("svg",{viewBox:`0 0 ${W} ${H}`,role:"img","aria-label":"일별 평균 대기시간 추이"},host);
+    const defs=el("defs",{},svg);
+    const g=el("linearGradient",{id:"af",x1:0,y1:0,x2:0,y2:1},defs);
+    el("stop",{offset:"0%","stop-color":"#8B5CF6","stop-opacity":".45"},g);
+    el("stop",{offset:"100%","stop-color":"#8B5CF6","stop-opacity":"0"},g);
+    const lg=el("linearGradient",{id:"lf",x1:0,y1:0,x2:1,y2:0},defs);
+    el("stop",{offset:"0%","stop-color":"#8B5CF6"},lg);el("stop",{offset:"100%","stop-color":"#F0ABFC"},lg);
+    const y0=32,y1=38;
+    const x=i=>m.l+i*(W-m.l-m.r)/(vals.length-1);
+    const y=v=>m.t+(y1-v)*(H-m.t-m.b)/(y1-y0);
+    for(let v=y0;v<=y1;v+=2){
+      el("line",{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:"rgba(180,160,255,.08)"},svg);
+      const t=el("text",{x:m.l-8,y:y(v)+4,"text-anchor":"end",fill:css("--muted"),"font-size":11,"font-family":"JetBrains Mono"},svg);t.textContent=v;
+    }
+    [0,6,13,20,27].forEach(i=>{const t=el("text",{x:x(i),y:H-8,"text-anchor":"middle",fill:css("--muted"),"font-size":11,"font-family":"JetBrains Mono"},svg);t.textContent=days[i];});
+    events.forEach((e,k)=>{
+      const xi=x(e.d-1);
+      el("line",{x1:xi,x2:xi,y1:m.t-4,y2:H-m.b,stroke:"rgba(240,171,252,.35)","stroke-dasharray":"3 4"},svg);
+      el("circle",{cx:xi,cy:m.t-10-k*0,r:3,fill:"#F0ABFC"},svg);
+    });
+    const lbl=el("text",{x:x(14)-6,y:m.t-7,"text-anchor":"end",fill:css("--p4"),"font-size":11},svg);lbl.textContent="조치 적용 9/15 · 9/17 · 9/18 →";
+    el("line",{x1:m.l,x2:x(14),y1:y(35.9),y2:y(35.9),stroke:css("--muted"),"stroke-dasharray":"2 4"},svg);
+    el("line",{x1:x(17),x2:W-m.r,y1:y(35.1),y2:y(35.1),stroke:css("--p3"),"stroke-dasharray":"2 4","stroke-opacity":".7"},svg);
+    const t2=el("text",{x:W-m.r,y:y(35.1)+16,"text-anchor":"end",fill:css("--p3"),"font-size":11,"font-family":"JetBrains Mono"},svg);t2.textContent="avg 35.1";
+    let d="";vals.forEach((v,i)=>d+=(i?"L":"M")+x(i)+","+y(v));
+    el("path",{d:d+`L${x(vals.length-1)},${H-m.b}L${x(0)},${H-m.b}Z`,fill:"url(#af)"},svg);
+    el("path",{d,fill:"none",stroke:"url(#lf)","stroke-width":2,"stroke-linejoin":"round","class":"glow-line"},svg);
+    const last=vals.length-1;
+    el("circle",{cx:x(last),cy:y(vals[last]),r:5,fill:"#F0ABFC",stroke:"#121019","stroke-width":2},svg);
+    // hover
+    const cross=el("line",{y1:m.t,y2:H-m.b,stroke:"rgba(255,255,255,.25)",visibility:"hidden"},svg);
+    const hdot=el("circle",{r:5,fill:"#fff",stroke:"#8B5CF6","stroke-width":2,visibility:"hidden"},svg);
+    const hit=el("rect",{x:m.l,y:m.t,width:W-m.l-m.r,height:H-m.t-m.b,fill:"transparent"},svg);
+    const tip=document.createElement("div");tip.className="tip";tip.hidden=true;host.appendChild(tip);
+    hit.addEventListener("mousemove",ev=>{
+      const r=svg.getBoundingClientRect();const sx=(ev.clientX-r.left)*W/r.width;
+      const i=Math.max(0,Math.min(last,Math.round((sx-m.l)/((W-m.l-m.r)/last))));
+      cross.setAttribute("x1",x(i));cross.setAttribute("x2",x(i));cross.setAttribute("visibility","visible");
+      hdot.setAttribute("cx",x(i));hdot.setAttribute("cy",y(vals[i]));hdot.setAttribute("visibility","visible");
+      const ev2=events.find(e=>e.d-1===i);
+      tip.innerHTML=`<div class="t">${days[i]}</div>평균 대기 <b>${vals[i].toFixed(1)}분</b>${ev2?`<div class="t" style="color:#F0ABFC">${ev2.l}</div>`:""}`;
+      tip.style.left=(x(i)*r.width/W)+"px";tip.style.top=(y(vals[i])*r.height/H)+"px";tip.hidden=false;
+    });
+    hit.addEventListener("mouseleave",()=>{tip.hidden=true;cross.setAttribute("visibility","hidden");hdot.setAttribute("visibility","hidden");});
+  }
+
+  /* ---- CAPA composition ---- */
+  function drawCapa(){
+    const host=document.getElementById("capa");host.innerHTML="";
+    const parts=[{k:"ITEM 3개 삭제",v:28.8,c:"url(#cg1)",n:"%%140260 · 144매 기준"},{k:"샘플링 확대 등",v:8.2,c:"#C084FC",n:"총 37.0h 중 잔여분"}];
+    const W=340,H=250,m={l:8,r:8,t:18,b:26};
+    const svg=el("svg",{viewBox:`0 0 ${W} ${H}`,role:"img","aria-label":"CAPA 확보 구성"},host);
+    const defs=el("defs",{},svg);
+    const g=el("linearGradient",{id:"cg1",x1:0,y1:1,x2:0,y2:0},defs);
+    el("stop",{offset:"0%","stop-color":"#6D28D9"},g);el("stop",{offset:"100%","stop-color":"#A78BFA"},g);
+    const tg=el("linearGradient",{id:"cg2",x1:0,y1:1,x2:0,y2:0},defs);
+    el("stop",{offset:"0%","stop-color":"#6D28D9"},tg);el("stop",{offset:"100%","stop-color":"#F0ABFC"},tg);
+    const max=40,bh=H-m.t-m.b,y=v=>m.t+bh-(v/max)*bh;
+    const cols=[{lab:"ITEM 삭제",from:0,to:28.8,fill:"url(#cg1)"},{lab:"샘플링 등",from:28.8,to:37,fill:"#C084FC"},{lab:"합계",from:0,to:37,fill:"url(#cg2)"}];
+    const cw=64,gap=(W-m.l-m.r-cw*3)/2;
+    [10,20,30,40].forEach(v=>el("line",{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:"rgba(180,160,255,.07)"},svg));
+    const tip=document.createElement("div");tip.className="tip";tip.hidden=true;host.appendChild(tip);
+    cols.forEach((c,i)=>{
+      const x0=m.l+i*(cw+gap);
+      const r=el("rect",{x:x0,y:y(c.to),width:cw,height:y(c.from)-y(c.to),rx:4,fill:c.fill},svg);
+      if(i<2){el("line",{x1:x0+cw,x2:x0+cw+gap,y1:y(c.to),y2:y(c.to),stroke:"rgba(255,255,255,.25)","stroke-dasharray":"2 3"},svg);}
+      const t=el("text",{x:x0+cw/2,y:y(c.to)-7,"text-anchor":"middle",fill:css("--text"),"font-size":13,"font-weight":600,"font-family":"JetBrains Mono"},svg);
+      t.textContent=(i<2?"+":"")+(c.to-c.from).toFixed(1)+"h";
+      const l=el("text",{x:x0+cw/2,y:H-8,"text-anchor":"middle",fill:css("--text-2"),"font-size":11.5},svg);l.textContent=c.lab;
+      r.style.cursor="default";
+      r.addEventListener("mousemove",ev=>{const b=svg.getBoundingClientRect();tip.innerHTML=`<div class="t">${c.lab}</div><b>${(c.to-c.from).toFixed(1)}h</b> / 월${i===0?'<div class="t">81.25→69.25분 · 144매 기준</div>':i===1?'<div class="t">37.0h − 28.8h</div>':''}`;tip.style.left=(ev.clientX-b.left)+"px";tip.style.top=(ev.clientY-b.top)+"px";tip.hidden=false;});
+      r.addEventListener("mouseleave",()=>tip.hidden=true);
+    });
+  }
+
+  /* ---- equipment (example data) ---- */
+  const eqs=[
+    {id:"CD-01",fl:"3F",ded:true,util:92,lots:6,over:1},{id:"CD-02",fl:"3F",ded:true,util:88,lots:5,over:0},
+    {id:"CD-03",fl:"3F",ded:false,util:74,lots:3,over:0},{id:"CD-04",fl:"3F",ded:true,util:90,lots:7,over:2},
+    {id:"CD-05",fl:"8F",ded:true,util:86,lots:4,over:0},{id:"CD-06",fl:"8F",ded:true,util:84,lots:4,over:0},
+    {id:"CD-07",fl:"8F",ded:false,util:79,lots:2,over:0},{id:"CD-08",fl:"8F",ded:true,util:91,lots:6,over:1},
+    {id:"CD-09",fl:"8F",ded:true,util:87,lots:5,over:0},{id:"CD-10",fl:"8F",ded:false,util:72,lots:2,over:0},
+    {id:"CD-11",fl:"8F",ded:true,util:89,lots:5,over:0},{id:"CD-12",fl:"3F",ded:false,util:68,lots:3,over:0}
+  ];
+  function drawEq(f){
+    const host=document.getElementById("eq");
+    const rows=eqs.filter(e=>f==="all"||e.fl===f);
+    host.innerHTML=`<div class="eqrow head"><span>호기</span><span>층</span><span>가동률</span><span style="text-align:right">대기 랏</span><span style="text-align:right">임계 초과</span></div>`+
+      rows.map(e=>`<div class="eqrow">
+        <span class="num" style="display:flex;gap:6px;align-items:center">${e.id}</span>
+        <span class="tag ${e.ded?'ded':''}" title="${e.ded?'장ST 전용':'공용'}">${e.fl}</span>
+        <span style="display:grid;grid-template-columns:1fr 38px;gap:8px;align-items:center"><span class="bar"><i style="width:${e.util}%"></i></span><span class="num" style="color:var(--text-2);font-size:12px;text-align:right">${e.util}%</span></span>
+        <span class="num" style="text-align:right">${e.lots}</span>
+        <span style="text-align:right">${e.over?`<span class="chip crit">▲ ${e.over}건</span>`:`<span class="chip good">0건</span>`}</span>
+      </div>`).join("");
+  }
+
+  document.querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{
+    document.querySelectorAll(".seg button").forEach(x=>x.setAttribute("aria-pressed","false"));
+    b.setAttribute("aria-pressed","true");drawEq(b.dataset.f);
+  }));
+  drawTrend();drawCapa();drawEq("all");
+})();
+</script>
+
+</body></html>
